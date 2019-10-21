@@ -1,0 +1,12 @@
+Host *
+  AddKeysToAgent yes
+  StrictHostKeyChecking no
+  UserKnownHostsFile /dev/null
+  IdentitiesOnly yes
+
+  # MULTIPLEXING CONNECTIONS (should speed up Ansible)
+  controlmaster auto
+  controlpath /tmp/ssh-%r@%h-%l:%p
+  ControlPersist yes
+  ControlPersist 60m
+

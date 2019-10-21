@@ -1,0 +1,11 @@
+---
+- name: Install Ansible
+  include_tasks: install-ansible.yaml
+  #tags: [ never, debug ]
+  
+- name: Install Pip3
+  include_tasks: install-pip3.yaml
+
+- name: Install Kubespray
+  include_tasks: install-kubespray.yaml
+

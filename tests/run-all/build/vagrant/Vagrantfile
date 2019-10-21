@@ -1,0 +1,2054 @@
+#TODO: Have we tested with this version?
+Vagrant.require_version ">= 1.6.0"
+
+require 'rbconfig'
+require 'fileutils'
+
+
+Vagrant.configure("2") do |config|
+
+    # Set the default provider for the OS
+    @os = RbConfig::CONFIG['host_os']
+    case
+    when @os.downcase.include?('linux')
+        operating_system = 'linux'
+        provider = "libvirt"
+    when @os.downcase.include?('darwin')
+        operating_system = 'darwin'
+        provider = "virtualbox"
+    else
+        puts "You OS hasn't been tested yet, go add support and send a patch."
+        exit
+    end
+
+
+    # Ensure the OS-Provider combination is supported
+    os_provider = operating_system + '-' + provider
+    if ! ['linux-virtualbox', 'linux-libvirt', 'darwin-virtualbox'].include? os_provider
+        puts "Unsupported provider: #{provider} on " + operating_system
+        puts "Consider adding support and send a patch"
+        exit
+    end
+
+    # Set the project_namespace
+    project_namespace = "ansible-playbook-deploy-kubespray"
+
+    # shorthand accessors
+    pn_l = project_namespace.downcase
+    pn_u = project_namespace.upcase
+
+    # Bash variables cannot use "-", they must use _
+    pn_u = pn_u.tr("-", "_")
+    pn_l = pn_l.tr("-", "_")
+
+    # Let the provider be overridden on a per-project basis by a local variable
+    if ENV[pn_u + '_VAGRANT_PROVIDER']
+        provider = ENV[pn_u + '_VAGRANT_PROVIDER']
+    end
+
+    # Explicitly set the provider variable (that Vagrant uses)
+    # This ensures CLI commands like 'vagrant status' use the correct provider
+    ENV['VAGRANT_DEFAULT_PROVIDER']="#{provider}"
+
+    # NVME Disk parameters
+    libvirt_nvme_path = ENV['HOME'] + "/.local/share/libvirt/images/"
+    libvirt_nvme_path = libvirt_nvme_path + "#{ pn_l }/"
+    FileUtils.mkdir_p libvirt_nvme_path
+
+    virtualbox_nvme_path = File.dirname(__FILE__) + "/" + ".vagrant/nvme_disks/"
+
+    virtualbox_nvme_path = virtualbox_nvme_path + "#{ pn_l }/"
+
+    FileUtils.mkdir_p virtualbox_nvme_path
+    # Disable the default folder syncing.
+    config.vm.synced_folder './', '/vagrant', disabled: true
+
+    # Box #1
+    config.vm.define "k-1" do |conf|# For details see: https://www.vagrantup.com/docs/virtualbox/configuration.html
+        conf.vm.provider :virtualbox do |vb, override|
+            vb.name = "#{project_namespace}_k-1" # name shown in Virtualbox
+            vb.customize ["modifyvm", :id, "--memory", '4096' ]
+            vb.customize ["modifyvm", :id, "--cpus", '4' ]
+            vb.customize ["modifyvm", :id, "--nictype1", 'Am79C973' ]
+            vb.customize ["modifyvm", :id, "--ioapic", 'on' ]
+            vb.customize ["modifyvm", :id, "--rtcuseutc", 'on' ]
+
+            # Support SSE4.x
+            vb.customize ["setextradata", :id, "VBoxInternal/CPUM/SSE4.1", "1"]
+            vb.customize ["setextradata", :id, "VBoxInternal/CPUM/SSE4.2", "1"]
+
+            override.vm.box = "generic/ubuntu1804"
+            override.vm.hostname = "k-1" # Set hostname in the OS
+            override.vm.boot_timeout = 300
+            override.vm.network "private_network", type: "dhcp"
+
+
+            # /dev/nvme0n1
+            file_1 = "#{virtualbox_nvme_path}" + "nvme_disk_k-1_0_0.vdi"
+            unless File.exist?( file_1 )
+                vb.customize ["createmedium", "disk", "--filename", file_1, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+                # Create the controller with the first disk file
+                vb.customize ["storagectl", :id, "--name", "nvme", "--add", "pcie", "--controller", "NVMe", "--portcount", "20", "--bootable", "off"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_1, "--port", 0, "--device", 0]
+            # /dev/nvme0n2
+            file_2 = "#{virtualbox_nvme_path}" + "nvme_disk_k-1_1_0.vdi"
+            unless File.exist?( file_2 )
+                vb.customize ["createmedium", "disk", "--filename", file_2, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_2, "--port", 1, "--device", 0]
+            # /dev/nvme0n3
+            file_3 = "#{virtualbox_nvme_path}" + "nvme_disk_k-1_2_0.vdi"
+            unless File.exist?( file_3 )
+                vb.customize ["createmedium", "disk", "--filename", file_3, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_3, "--port", 2, "--device", 0]
+            # /dev/nvme0n4
+            file_4 = "#{virtualbox_nvme_path}" + "nvme_disk_k-1_3_0.vdi"
+            unless File.exist?( file_4 )
+                vb.customize ["createmedium", "disk", "--filename", file_4, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_4, "--port", 3, "--device", 0]
+            # /dev/nvme0n5
+            file_5 = "#{virtualbox_nvme_path}" + "nvme_disk_k-1_4_0.vdi"
+            unless File.exist?( file_5 )
+                vb.customize ["createmedium", "disk", "--filename", file_5, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_5, "--port", 4, "--device", 0]
+            # /dev/nvme0n6
+            file_6 = "#{virtualbox_nvme_path}" + "nvme_disk_k-1_5_0.vdi"
+            unless File.exist?( file_6 )
+                vb.customize ["createmedium", "disk", "--filename", file_6, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_6, "--port", 5, "--device", 0]
+            # /dev/nvme0n7
+            file_7 = "#{virtualbox_nvme_path}" + "nvme_disk_k-1_6_0.vdi"
+            unless File.exist?( file_7 )
+                vb.customize ["createmedium", "disk", "--filename", file_7, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_7, "--port", 6, "--device", 0]
+            # /dev/nvme0n8
+            file_8 = "#{virtualbox_nvme_path}" + "nvme_disk_k-1_7_0.vdi"
+            unless File.exist?( file_8 )
+                vb.customize ["createmedium", "disk", "--filename", file_8, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_8, "--port", 7, "--device", 0]
+            # /dev/nvme0n9
+            file_9 = "#{virtualbox_nvme_path}" + "nvme_disk_k-1_8_0.vdi"
+            unless File.exist?( file_9 )
+                vb.customize ["createmedium", "disk", "--filename", file_9, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_9, "--port", 8, "--device", 0]
+            # /dev/nvme0n10
+            file_10 = "#{virtualbox_nvme_path}" + "nvme_disk_k-1_9_0.vdi"
+            unless File.exist?( file_10 )
+                vb.customize ["createmedium", "disk", "--filename", file_10, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_10, "--port", 9, "--device", 0]
+            # /dev/nvme0n11
+            file_11 = "#{virtualbox_nvme_path}" + "nvme_disk_k-1_10_0.vdi"
+            unless File.exist?( file_11 )
+                vb.customize ["createmedium", "disk", "--filename", file_11, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_11, "--port", 10, "--device", 0]
+            # /dev/nvme0n12
+            file_12 = "#{virtualbox_nvme_path}" + "nvme_disk_k-1_11_0.vdi"
+            unless File.exist?( file_12 )
+                vb.customize ["createmedium", "disk", "--filename", file_12, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_12, "--port", 11, "--device", 0]
+            # /dev/nvme0n13
+            file_13 = "#{virtualbox_nvme_path}" + "nvme_disk_k-1_12_0.vdi"
+            unless File.exist?( file_13 )
+                vb.customize ["createmedium", "disk", "--filename", file_13, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_13, "--port", 12, "--device", 0]
+            # /dev/nvme0n14
+            file_14 = "#{virtualbox_nvme_path}" + "nvme_disk_k-1_13_0.vdi"
+            unless File.exist?( file_14 )
+                vb.customize ["createmedium", "disk", "--filename", file_14, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_14, "--port", 13, "--device", 0]
+            # /dev/nvme0n15
+            file_15 = "#{virtualbox_nvme_path}" + "nvme_disk_k-1_14_0.vdi"
+            unless File.exist?( file_15 )
+                vb.customize ["createmedium", "disk", "--filename", file_15, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_15, "--port", 14, "--device", 0]
+            # /dev/nvme0n16
+            file_16 = "#{virtualbox_nvme_path}" + "nvme_disk_k-1_15_0.vdi"
+            unless File.exist?( file_16 )
+                vb.customize ["createmedium", "disk", "--filename", file_16, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_16, "--port", 15, "--device", 0]
+            # /dev/nvme0n17
+            file_17 = "#{virtualbox_nvme_path}" + "nvme_disk_k-1_16_0.vdi"
+            unless File.exist?( file_17 )
+                vb.customize ["createmedium", "disk", "--filename", file_17, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_17, "--port", 16, "--device", 0]
+            # /dev/nvme0n18
+            file_18 = "#{virtualbox_nvme_path}" + "nvme_disk_k-1_17_0.vdi"
+            unless File.exist?( file_18 )
+                vb.customize ["createmedium", "disk", "--filename", file_18, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_18, "--port", 17, "--device", 0]
+            # /dev/nvme0n19
+            file_19 = "#{virtualbox_nvme_path}" + "nvme_disk_k-1_18_0.vdi"
+            unless File.exist?( file_19 )
+                vb.customize ["createmedium", "disk", "--filename", file_19, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_19, "--port", 18, "--device", 0]
+            # /dev/nvme0n20
+            file_20 = "#{virtualbox_nvme_path}" + "nvme_disk_k-1_19_0.vdi"
+            unless File.exist?( file_20 )
+                vb.customize ["createmedium", "disk", "--filename", file_20, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_20, "--port", 19, "--device", 0]
+        end # conf.vm.provider :virtualbox do |vb, override|
+
+        # For details see: https://github.com/vagrant-libvirt/vagrant-libvirt
+        conf.vm.provider :libvirt do |libvirt, override|            override.vm.box = "generic/ubuntu1804"
+            override.vm.hostname = "k-1" # Set hostname in the OS
+            override.vm.boot_timeout = 300
+            libvirt.watchdog :model => 'i6300esb', :action => 'reset'
+            libvirt.storage_pool_path = File.dirname(__FILE__)
+            libvirt.memory = 4096
+            libvirt.cpus = 4
+       	    libvirt.emulator_path = "/usr/bin/qemu-system-x86_64"
+            libvirt.machine_type = "q35"
+            libvirt.default_prefix = "#{project_namespace}"
+
+
+            # START: LIBVIRT NVME DRIVES
+            nvme_disk_1_1 = libvirt_nvme_path + "k-1_1.qcow2"
+            unless File.exist? ( nvme_disk_1_1 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_1_1 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_1_1 },if=none,id=drv1"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv1,serial=serial#1"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_1_1 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_1_1 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_1_2 = libvirt_nvme_path + "k-1_2.qcow2"
+            unless File.exist? ( nvme_disk_1_2 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_1_2 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_1_2 },if=none,id=drv2"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv2,serial=serial#2"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_1_2 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_1_2 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_1_3 = libvirt_nvme_path + "k-1_3.qcow2"
+            unless File.exist? ( nvme_disk_1_3 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_1_3 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_1_3 },if=none,id=drv3"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv3,serial=serial#3"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_1_3 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_1_3 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_1_4 = libvirt_nvme_path + "k-1_4.qcow2"
+            unless File.exist? ( nvme_disk_1_4 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_1_4 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_1_4 },if=none,id=drv4"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv4,serial=serial#4"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_1_4 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_1_4 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_1_5 = libvirt_nvme_path + "k-1_5.qcow2"
+            unless File.exist? ( nvme_disk_1_5 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_1_5 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_1_5 },if=none,id=drv5"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv5,serial=serial#5"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_1_5 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_1_5 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_1_6 = libvirt_nvme_path + "k-1_6.qcow2"
+            unless File.exist? ( nvme_disk_1_6 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_1_6 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_1_6 },if=none,id=drv6"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv6,serial=serial#6"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_1_6 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_1_6 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_1_7 = libvirt_nvme_path + "k-1_7.qcow2"
+            unless File.exist? ( nvme_disk_1_7 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_1_7 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_1_7 },if=none,id=drv7"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv7,serial=serial#7"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_1_7 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_1_7 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_1_8 = libvirt_nvme_path + "k-1_8.qcow2"
+            unless File.exist? ( nvme_disk_1_8 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_1_8 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_1_8 },if=none,id=drv8"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv8,serial=serial#8"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_1_8 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_1_8 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_1_9 = libvirt_nvme_path + "k-1_9.qcow2"
+            unless File.exist? ( nvme_disk_1_9 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_1_9 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_1_9 },if=none,id=drv9"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv9,serial=serial#9"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_1_9 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_1_9 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_1_10 = libvirt_nvme_path + "k-1_10.qcow2"
+            unless File.exist? ( nvme_disk_1_10 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_1_10 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_1_10 },if=none,id=drv10"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv10,serial=serial#10"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_1_10 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_1_10 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_1_11 = libvirt_nvme_path + "k-1_11.qcow2"
+            unless File.exist? ( nvme_disk_1_11 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_1_11 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_1_11 },if=none,id=drv11"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv11,serial=serial#11"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_1_11 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_1_11 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_1_12 = libvirt_nvme_path + "k-1_12.qcow2"
+            unless File.exist? ( nvme_disk_1_12 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_1_12 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_1_12 },if=none,id=drv12"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv12,serial=serial#12"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_1_12 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_1_12 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_1_13 = libvirt_nvme_path + "k-1_13.qcow2"
+            unless File.exist? ( nvme_disk_1_13 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_1_13 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_1_13 },if=none,id=drv13"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv13,serial=serial#13"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_1_13 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_1_13 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_1_14 = libvirt_nvme_path + "k-1_14.qcow2"
+            unless File.exist? ( nvme_disk_1_14 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_1_14 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_1_14 },if=none,id=drv14"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv14,serial=serial#14"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_1_14 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_1_14 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_1_15 = libvirt_nvme_path + "k-1_15.qcow2"
+            unless File.exist? ( nvme_disk_1_15 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_1_15 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_1_15 },if=none,id=drv15"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv15,serial=serial#15"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_1_15 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_1_15 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_1_16 = libvirt_nvme_path + "k-1_16.qcow2"
+            unless File.exist? ( nvme_disk_1_16 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_1_16 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_1_16 },if=none,id=drv16"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv16,serial=serial#16"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_1_16 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_1_16 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_1_17 = libvirt_nvme_path + "k-1_17.qcow2"
+            unless File.exist? ( nvme_disk_1_17 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_1_17 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_1_17 },if=none,id=drv17"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv17,serial=serial#17"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_1_17 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_1_17 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_1_18 = libvirt_nvme_path + "k-1_18.qcow2"
+            unless File.exist? ( nvme_disk_1_18 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_1_18 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_1_18 },if=none,id=drv18"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv18,serial=serial#18"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_1_18 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_1_18 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_1_19 = libvirt_nvme_path + "k-1_19.qcow2"
+            unless File.exist? ( nvme_disk_1_19 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_1_19 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_1_19 },if=none,id=drv19"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv19,serial=serial#19"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_1_19 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_1_19 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_1_20 = libvirt_nvme_path + "k-1_20.qcow2"
+            unless File.exist? ( nvme_disk_1_20 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_1_20 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_1_20 },if=none,id=drv20"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv20,serial=serial#20"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_1_20 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_1_20 }"}
+                trigger.on_error = :halt
+            end
+ 	            # END: LIBVIRT NVME DRIVES
+        end # conf.vm.provider :libvirt do |libvirt, override|
+    end # config.vm.define "k-1" do |conf|
+
+
+    # Box #2
+    config.vm.define "k-2" do |conf|# For details see: https://www.vagrantup.com/docs/virtualbox/configuration.html
+        conf.vm.provider :virtualbox do |vb, override|
+            vb.name = "#{project_namespace}_k-2" # name shown in Virtualbox
+            vb.customize ["modifyvm", :id, "--memory", '4096' ]
+            vb.customize ["modifyvm", :id, "--cpus", '4' ]
+            vb.customize ["modifyvm", :id, "--nictype1", 'Am79C973' ]
+            vb.customize ["modifyvm", :id, "--ioapic", 'on' ]
+            vb.customize ["modifyvm", :id, "--rtcuseutc", 'on' ]
+
+            # Support SSE4.x
+            vb.customize ["setextradata", :id, "VBoxInternal/CPUM/SSE4.1", "1"]
+            vb.customize ["setextradata", :id, "VBoxInternal/CPUM/SSE4.2", "1"]
+
+            override.vm.box = "generic/ubuntu1804"
+            override.vm.hostname = "k-2" # Set hostname in the OS
+            override.vm.boot_timeout = 300
+            override.vm.network "private_network", type: "dhcp"
+
+
+            # /dev/nvme0n1
+            file_1 = "#{virtualbox_nvme_path}" + "nvme_disk_k-2_0_0.vdi"
+            unless File.exist?( file_1 )
+                vb.customize ["createmedium", "disk", "--filename", file_1, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+                # Create the controller with the first disk file
+                vb.customize ["storagectl", :id, "--name", "nvme", "--add", "pcie", "--controller", "NVMe", "--portcount", "20", "--bootable", "off"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_1, "--port", 0, "--device", 0]
+            # /dev/nvme0n2
+            file_2 = "#{virtualbox_nvme_path}" + "nvme_disk_k-2_1_0.vdi"
+            unless File.exist?( file_2 )
+                vb.customize ["createmedium", "disk", "--filename", file_2, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_2, "--port", 1, "--device", 0]
+            # /dev/nvme0n3
+            file_3 = "#{virtualbox_nvme_path}" + "nvme_disk_k-2_2_0.vdi"
+            unless File.exist?( file_3 )
+                vb.customize ["createmedium", "disk", "--filename", file_3, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_3, "--port", 2, "--device", 0]
+            # /dev/nvme0n4
+            file_4 = "#{virtualbox_nvme_path}" + "nvme_disk_k-2_3_0.vdi"
+            unless File.exist?( file_4 )
+                vb.customize ["createmedium", "disk", "--filename", file_4, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_4, "--port", 3, "--device", 0]
+            # /dev/nvme0n5
+            file_5 = "#{virtualbox_nvme_path}" + "nvme_disk_k-2_4_0.vdi"
+            unless File.exist?( file_5 )
+                vb.customize ["createmedium", "disk", "--filename", file_5, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_5, "--port", 4, "--device", 0]
+            # /dev/nvme0n6
+            file_6 = "#{virtualbox_nvme_path}" + "nvme_disk_k-2_5_0.vdi"
+            unless File.exist?( file_6 )
+                vb.customize ["createmedium", "disk", "--filename", file_6, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_6, "--port", 5, "--device", 0]
+            # /dev/nvme0n7
+            file_7 = "#{virtualbox_nvme_path}" + "nvme_disk_k-2_6_0.vdi"
+            unless File.exist?( file_7 )
+                vb.customize ["createmedium", "disk", "--filename", file_7, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_7, "--port", 6, "--device", 0]
+            # /dev/nvme0n8
+            file_8 = "#{virtualbox_nvme_path}" + "nvme_disk_k-2_7_0.vdi"
+            unless File.exist?( file_8 )
+                vb.customize ["createmedium", "disk", "--filename", file_8, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_8, "--port", 7, "--device", 0]
+            # /dev/nvme0n9
+            file_9 = "#{virtualbox_nvme_path}" + "nvme_disk_k-2_8_0.vdi"
+            unless File.exist?( file_9 )
+                vb.customize ["createmedium", "disk", "--filename", file_9, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_9, "--port", 8, "--device", 0]
+            # /dev/nvme0n10
+            file_10 = "#{virtualbox_nvme_path}" + "nvme_disk_k-2_9_0.vdi"
+            unless File.exist?( file_10 )
+                vb.customize ["createmedium", "disk", "--filename", file_10, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_10, "--port", 9, "--device", 0]
+            # /dev/nvme0n11
+            file_11 = "#{virtualbox_nvme_path}" + "nvme_disk_k-2_10_0.vdi"
+            unless File.exist?( file_11 )
+                vb.customize ["createmedium", "disk", "--filename", file_11, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_11, "--port", 10, "--device", 0]
+            # /dev/nvme0n12
+            file_12 = "#{virtualbox_nvme_path}" + "nvme_disk_k-2_11_0.vdi"
+            unless File.exist?( file_12 )
+                vb.customize ["createmedium", "disk", "--filename", file_12, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_12, "--port", 11, "--device", 0]
+            # /dev/nvme0n13
+            file_13 = "#{virtualbox_nvme_path}" + "nvme_disk_k-2_12_0.vdi"
+            unless File.exist?( file_13 )
+                vb.customize ["createmedium", "disk", "--filename", file_13, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_13, "--port", 12, "--device", 0]
+            # /dev/nvme0n14
+            file_14 = "#{virtualbox_nvme_path}" + "nvme_disk_k-2_13_0.vdi"
+            unless File.exist?( file_14 )
+                vb.customize ["createmedium", "disk", "--filename", file_14, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_14, "--port", 13, "--device", 0]
+            # /dev/nvme0n15
+            file_15 = "#{virtualbox_nvme_path}" + "nvme_disk_k-2_14_0.vdi"
+            unless File.exist?( file_15 )
+                vb.customize ["createmedium", "disk", "--filename", file_15, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_15, "--port", 14, "--device", 0]
+            # /dev/nvme0n16
+            file_16 = "#{virtualbox_nvme_path}" + "nvme_disk_k-2_15_0.vdi"
+            unless File.exist?( file_16 )
+                vb.customize ["createmedium", "disk", "--filename", file_16, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_16, "--port", 15, "--device", 0]
+            # /dev/nvme0n17
+            file_17 = "#{virtualbox_nvme_path}" + "nvme_disk_k-2_16_0.vdi"
+            unless File.exist?( file_17 )
+                vb.customize ["createmedium", "disk", "--filename", file_17, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_17, "--port", 16, "--device", 0]
+            # /dev/nvme0n18
+            file_18 = "#{virtualbox_nvme_path}" + "nvme_disk_k-2_17_0.vdi"
+            unless File.exist?( file_18 )
+                vb.customize ["createmedium", "disk", "--filename", file_18, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_18, "--port", 17, "--device", 0]
+            # /dev/nvme0n19
+            file_19 = "#{virtualbox_nvme_path}" + "nvme_disk_k-2_18_0.vdi"
+            unless File.exist?( file_19 )
+                vb.customize ["createmedium", "disk", "--filename", file_19, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_19, "--port", 18, "--device", 0]
+            # /dev/nvme0n20
+            file_20 = "#{virtualbox_nvme_path}" + "nvme_disk_k-2_19_0.vdi"
+            unless File.exist?( file_20 )
+                vb.customize ["createmedium", "disk", "--filename", file_20, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_20, "--port", 19, "--device", 0]
+        end # conf.vm.provider :virtualbox do |vb, override|
+
+        # For details see: https://github.com/vagrant-libvirt/vagrant-libvirt
+        conf.vm.provider :libvirt do |libvirt, override|            override.vm.box = "generic/ubuntu1804"
+            override.vm.hostname = "k-2" # Set hostname in the OS
+            override.vm.boot_timeout = 300
+            libvirt.watchdog :model => 'i6300esb', :action => 'reset'
+            libvirt.storage_pool_path = File.dirname(__FILE__)
+            libvirt.memory = 4096
+            libvirt.cpus = 4
+       	    libvirt.emulator_path = "/usr/bin/qemu-system-x86_64"
+            libvirt.machine_type = "q35"
+            libvirt.default_prefix = "#{project_namespace}"
+
+
+            # START: LIBVIRT NVME DRIVES
+            nvme_disk_2_1 = libvirt_nvme_path + "k-2_1.qcow2"
+            unless File.exist? ( nvme_disk_2_1 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_2_1 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_2_1 },if=none,id=drv1"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv1,serial=serial#1"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_2_1 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_2_1 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_2_2 = libvirt_nvme_path + "k-2_2.qcow2"
+            unless File.exist? ( nvme_disk_2_2 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_2_2 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_2_2 },if=none,id=drv2"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv2,serial=serial#2"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_2_2 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_2_2 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_2_3 = libvirt_nvme_path + "k-2_3.qcow2"
+            unless File.exist? ( nvme_disk_2_3 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_2_3 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_2_3 },if=none,id=drv3"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv3,serial=serial#3"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_2_3 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_2_3 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_2_4 = libvirt_nvme_path + "k-2_4.qcow2"
+            unless File.exist? ( nvme_disk_2_4 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_2_4 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_2_4 },if=none,id=drv4"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv4,serial=serial#4"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_2_4 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_2_4 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_2_5 = libvirt_nvme_path + "k-2_5.qcow2"
+            unless File.exist? ( nvme_disk_2_5 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_2_5 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_2_5 },if=none,id=drv5"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv5,serial=serial#5"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_2_5 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_2_5 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_2_6 = libvirt_nvme_path + "k-2_6.qcow2"
+            unless File.exist? ( nvme_disk_2_6 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_2_6 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_2_6 },if=none,id=drv6"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv6,serial=serial#6"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_2_6 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_2_6 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_2_7 = libvirt_nvme_path + "k-2_7.qcow2"
+            unless File.exist? ( nvme_disk_2_7 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_2_7 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_2_7 },if=none,id=drv7"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv7,serial=serial#7"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_2_7 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_2_7 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_2_8 = libvirt_nvme_path + "k-2_8.qcow2"
+            unless File.exist? ( nvme_disk_2_8 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_2_8 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_2_8 },if=none,id=drv8"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv8,serial=serial#8"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_2_8 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_2_8 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_2_9 = libvirt_nvme_path + "k-2_9.qcow2"
+            unless File.exist? ( nvme_disk_2_9 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_2_9 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_2_9 },if=none,id=drv9"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv9,serial=serial#9"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_2_9 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_2_9 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_2_10 = libvirt_nvme_path + "k-2_10.qcow2"
+            unless File.exist? ( nvme_disk_2_10 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_2_10 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_2_10 },if=none,id=drv10"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv10,serial=serial#10"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_2_10 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_2_10 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_2_11 = libvirt_nvme_path + "k-2_11.qcow2"
+            unless File.exist? ( nvme_disk_2_11 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_2_11 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_2_11 },if=none,id=drv11"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv11,serial=serial#11"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_2_11 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_2_11 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_2_12 = libvirt_nvme_path + "k-2_12.qcow2"
+            unless File.exist? ( nvme_disk_2_12 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_2_12 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_2_12 },if=none,id=drv12"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv12,serial=serial#12"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_2_12 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_2_12 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_2_13 = libvirt_nvme_path + "k-2_13.qcow2"
+            unless File.exist? ( nvme_disk_2_13 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_2_13 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_2_13 },if=none,id=drv13"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv13,serial=serial#13"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_2_13 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_2_13 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_2_14 = libvirt_nvme_path + "k-2_14.qcow2"
+            unless File.exist? ( nvme_disk_2_14 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_2_14 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_2_14 },if=none,id=drv14"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv14,serial=serial#14"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_2_14 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_2_14 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_2_15 = libvirt_nvme_path + "k-2_15.qcow2"
+            unless File.exist? ( nvme_disk_2_15 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_2_15 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_2_15 },if=none,id=drv15"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv15,serial=serial#15"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_2_15 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_2_15 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_2_16 = libvirt_nvme_path + "k-2_16.qcow2"
+            unless File.exist? ( nvme_disk_2_16 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_2_16 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_2_16 },if=none,id=drv16"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv16,serial=serial#16"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_2_16 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_2_16 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_2_17 = libvirt_nvme_path + "k-2_17.qcow2"
+            unless File.exist? ( nvme_disk_2_17 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_2_17 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_2_17 },if=none,id=drv17"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv17,serial=serial#17"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_2_17 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_2_17 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_2_18 = libvirt_nvme_path + "k-2_18.qcow2"
+            unless File.exist? ( nvme_disk_2_18 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_2_18 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_2_18 },if=none,id=drv18"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv18,serial=serial#18"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_2_18 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_2_18 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_2_19 = libvirt_nvme_path + "k-2_19.qcow2"
+            unless File.exist? ( nvme_disk_2_19 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_2_19 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_2_19 },if=none,id=drv19"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv19,serial=serial#19"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_2_19 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_2_19 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_2_20 = libvirt_nvme_path + "k-2_20.qcow2"
+            unless File.exist? ( nvme_disk_2_20 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_2_20 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_2_20 },if=none,id=drv20"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv20,serial=serial#20"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_2_20 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_2_20 }"}
+                trigger.on_error = :halt
+            end
+ 	            # END: LIBVIRT NVME DRIVES
+        end # conf.vm.provider :libvirt do |libvirt, override|
+    end # config.vm.define "k-2" do |conf|
+
+
+    # Box #3
+    config.vm.define "k-3" do |conf|# For details see: https://www.vagrantup.com/docs/virtualbox/configuration.html
+        conf.vm.provider :virtualbox do |vb, override|
+            vb.name = "#{project_namespace}_k-3" # name shown in Virtualbox
+            vb.customize ["modifyvm", :id, "--memory", '4096' ]
+            vb.customize ["modifyvm", :id, "--cpus", '4' ]
+            vb.customize ["modifyvm", :id, "--nictype1", 'Am79C973' ]
+            vb.customize ["modifyvm", :id, "--ioapic", 'on' ]
+            vb.customize ["modifyvm", :id, "--rtcuseutc", 'on' ]
+
+            # Support SSE4.x
+            vb.customize ["setextradata", :id, "VBoxInternal/CPUM/SSE4.1", "1"]
+            vb.customize ["setextradata", :id, "VBoxInternal/CPUM/SSE4.2", "1"]
+
+            override.vm.box = "generic/ubuntu1804"
+            override.vm.hostname = "k-3" # Set hostname in the OS
+            override.vm.boot_timeout = 300
+            override.vm.network "private_network", type: "dhcp"
+
+
+            # /dev/nvme0n1
+            file_1 = "#{virtualbox_nvme_path}" + "nvme_disk_k-3_0_0.vdi"
+            unless File.exist?( file_1 )
+                vb.customize ["createmedium", "disk", "--filename", file_1, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+                # Create the controller with the first disk file
+                vb.customize ["storagectl", :id, "--name", "nvme", "--add", "pcie", "--controller", "NVMe", "--portcount", "20", "--bootable", "off"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_1, "--port", 0, "--device", 0]
+            # /dev/nvme0n2
+            file_2 = "#{virtualbox_nvme_path}" + "nvme_disk_k-3_1_0.vdi"
+            unless File.exist?( file_2 )
+                vb.customize ["createmedium", "disk", "--filename", file_2, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_2, "--port", 1, "--device", 0]
+            # /dev/nvme0n3
+            file_3 = "#{virtualbox_nvme_path}" + "nvme_disk_k-3_2_0.vdi"
+            unless File.exist?( file_3 )
+                vb.customize ["createmedium", "disk", "--filename", file_3, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_3, "--port", 2, "--device", 0]
+            # /dev/nvme0n4
+            file_4 = "#{virtualbox_nvme_path}" + "nvme_disk_k-3_3_0.vdi"
+            unless File.exist?( file_4 )
+                vb.customize ["createmedium", "disk", "--filename", file_4, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_4, "--port", 3, "--device", 0]
+            # /dev/nvme0n5
+            file_5 = "#{virtualbox_nvme_path}" + "nvme_disk_k-3_4_0.vdi"
+            unless File.exist?( file_5 )
+                vb.customize ["createmedium", "disk", "--filename", file_5, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_5, "--port", 4, "--device", 0]
+            # /dev/nvme0n6
+            file_6 = "#{virtualbox_nvme_path}" + "nvme_disk_k-3_5_0.vdi"
+            unless File.exist?( file_6 )
+                vb.customize ["createmedium", "disk", "--filename", file_6, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_6, "--port", 5, "--device", 0]
+            # /dev/nvme0n7
+            file_7 = "#{virtualbox_nvme_path}" + "nvme_disk_k-3_6_0.vdi"
+            unless File.exist?( file_7 )
+                vb.customize ["createmedium", "disk", "--filename", file_7, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_7, "--port", 6, "--device", 0]
+            # /dev/nvme0n8
+            file_8 = "#{virtualbox_nvme_path}" + "nvme_disk_k-3_7_0.vdi"
+            unless File.exist?( file_8 )
+                vb.customize ["createmedium", "disk", "--filename", file_8, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_8, "--port", 7, "--device", 0]
+            # /dev/nvme0n9
+            file_9 = "#{virtualbox_nvme_path}" + "nvme_disk_k-3_8_0.vdi"
+            unless File.exist?( file_9 )
+                vb.customize ["createmedium", "disk", "--filename", file_9, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_9, "--port", 8, "--device", 0]
+            # /dev/nvme0n10
+            file_10 = "#{virtualbox_nvme_path}" + "nvme_disk_k-3_9_0.vdi"
+            unless File.exist?( file_10 )
+                vb.customize ["createmedium", "disk", "--filename", file_10, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_10, "--port", 9, "--device", 0]
+            # /dev/nvme0n11
+            file_11 = "#{virtualbox_nvme_path}" + "nvme_disk_k-3_10_0.vdi"
+            unless File.exist?( file_11 )
+                vb.customize ["createmedium", "disk", "--filename", file_11, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_11, "--port", 10, "--device", 0]
+            # /dev/nvme0n12
+            file_12 = "#{virtualbox_nvme_path}" + "nvme_disk_k-3_11_0.vdi"
+            unless File.exist?( file_12 )
+                vb.customize ["createmedium", "disk", "--filename", file_12, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_12, "--port", 11, "--device", 0]
+            # /dev/nvme0n13
+            file_13 = "#{virtualbox_nvme_path}" + "nvme_disk_k-3_12_0.vdi"
+            unless File.exist?( file_13 )
+                vb.customize ["createmedium", "disk", "--filename", file_13, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_13, "--port", 12, "--device", 0]
+            # /dev/nvme0n14
+            file_14 = "#{virtualbox_nvme_path}" + "nvme_disk_k-3_13_0.vdi"
+            unless File.exist?( file_14 )
+                vb.customize ["createmedium", "disk", "--filename", file_14, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_14, "--port", 13, "--device", 0]
+            # /dev/nvme0n15
+            file_15 = "#{virtualbox_nvme_path}" + "nvme_disk_k-3_14_0.vdi"
+            unless File.exist?( file_15 )
+                vb.customize ["createmedium", "disk", "--filename", file_15, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_15, "--port", 14, "--device", 0]
+            # /dev/nvme0n16
+            file_16 = "#{virtualbox_nvme_path}" + "nvme_disk_k-3_15_0.vdi"
+            unless File.exist?( file_16 )
+                vb.customize ["createmedium", "disk", "--filename", file_16, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_16, "--port", 15, "--device", 0]
+            # /dev/nvme0n17
+            file_17 = "#{virtualbox_nvme_path}" + "nvme_disk_k-3_16_0.vdi"
+            unless File.exist?( file_17 )
+                vb.customize ["createmedium", "disk", "--filename", file_17, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_17, "--port", 16, "--device", 0]
+            # /dev/nvme0n18
+            file_18 = "#{virtualbox_nvme_path}" + "nvme_disk_k-3_17_0.vdi"
+            unless File.exist?( file_18 )
+                vb.customize ["createmedium", "disk", "--filename", file_18, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_18, "--port", 17, "--device", 0]
+            # /dev/nvme0n19
+            file_19 = "#{virtualbox_nvme_path}" + "nvme_disk_k-3_18_0.vdi"
+            unless File.exist?( file_19 )
+                vb.customize ["createmedium", "disk", "--filename", file_19, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_19, "--port", 18, "--device", 0]
+            # /dev/nvme0n20
+            file_20 = "#{virtualbox_nvme_path}" + "nvme_disk_k-3_19_0.vdi"
+            unless File.exist?( file_20 )
+                vb.customize ["createmedium", "disk", "--filename", file_20, "--variant", "Standard", "--size", "102400", "--format", "VDI"]
+            end
+            vb.customize ["storageattach", :id, "--storagectl", "nvme", "--type", "hdd", "--medium", file_20, "--port", 19, "--device", 0]
+        end # conf.vm.provider :virtualbox do |vb, override|
+
+        # For details see: https://github.com/vagrant-libvirt/vagrant-libvirt
+        conf.vm.provider :libvirt do |libvirt, override|            override.vm.box = "generic/ubuntu1804"
+            override.vm.hostname = "k-3" # Set hostname in the OS
+            override.vm.boot_timeout = 300
+            libvirt.watchdog :model => 'i6300esb', :action => 'reset'
+            libvirt.storage_pool_path = File.dirname(__FILE__)
+            libvirt.memory = 4096
+            libvirt.cpus = 4
+       	    libvirt.emulator_path = "/usr/bin/qemu-system-x86_64"
+            libvirt.machine_type = "q35"
+            libvirt.default_prefix = "#{project_namespace}"
+
+
+            # START: LIBVIRT NVME DRIVES
+            nvme_disk_3_1 = libvirt_nvme_path + "k-3_1.qcow2"
+            unless File.exist? ( nvme_disk_3_1 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_3_1 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_3_1 },if=none,id=drv1"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv1,serial=serial#1"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_3_1 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_3_1 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_3_2 = libvirt_nvme_path + "k-3_2.qcow2"
+            unless File.exist? ( nvme_disk_3_2 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_3_2 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_3_2 },if=none,id=drv2"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv2,serial=serial#2"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_3_2 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_3_2 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_3_3 = libvirt_nvme_path + "k-3_3.qcow2"
+            unless File.exist? ( nvme_disk_3_3 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_3_3 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_3_3 },if=none,id=drv3"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv3,serial=serial#3"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_3_3 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_3_3 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_3_4 = libvirt_nvme_path + "k-3_4.qcow2"
+            unless File.exist? ( nvme_disk_3_4 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_3_4 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_3_4 },if=none,id=drv4"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv4,serial=serial#4"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_3_4 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_3_4 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_3_5 = libvirt_nvme_path + "k-3_5.qcow2"
+            unless File.exist? ( nvme_disk_3_5 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_3_5 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_3_5 },if=none,id=drv5"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv5,serial=serial#5"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_3_5 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_3_5 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_3_6 = libvirt_nvme_path + "k-3_6.qcow2"
+            unless File.exist? ( nvme_disk_3_6 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_3_6 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_3_6 },if=none,id=drv6"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv6,serial=serial#6"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_3_6 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_3_6 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_3_7 = libvirt_nvme_path + "k-3_7.qcow2"
+            unless File.exist? ( nvme_disk_3_7 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_3_7 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_3_7 },if=none,id=drv7"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv7,serial=serial#7"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_3_7 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_3_7 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_3_8 = libvirt_nvme_path + "k-3_8.qcow2"
+            unless File.exist? ( nvme_disk_3_8 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_3_8 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_3_8 },if=none,id=drv8"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv8,serial=serial#8"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_3_8 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_3_8 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_3_9 = libvirt_nvme_path + "k-3_9.qcow2"
+            unless File.exist? ( nvme_disk_3_9 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_3_9 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_3_9 },if=none,id=drv9"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv9,serial=serial#9"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_3_9 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_3_9 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_3_10 = libvirt_nvme_path + "k-3_10.qcow2"
+            unless File.exist? ( nvme_disk_3_10 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_3_10 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_3_10 },if=none,id=drv10"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv10,serial=serial#10"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_3_10 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_3_10 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_3_11 = libvirt_nvme_path + "k-3_11.qcow2"
+            unless File.exist? ( nvme_disk_3_11 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_3_11 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_3_11 },if=none,id=drv11"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv11,serial=serial#11"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_3_11 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_3_11 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_3_12 = libvirt_nvme_path + "k-3_12.qcow2"
+            unless File.exist? ( nvme_disk_3_12 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_3_12 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_3_12 },if=none,id=drv12"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv12,serial=serial#12"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_3_12 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_3_12 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_3_13 = libvirt_nvme_path + "k-3_13.qcow2"
+            unless File.exist? ( nvme_disk_3_13 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_3_13 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_3_13 },if=none,id=drv13"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv13,serial=serial#13"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_3_13 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_3_13 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_3_14 = libvirt_nvme_path + "k-3_14.qcow2"
+            unless File.exist? ( nvme_disk_3_14 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_3_14 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_3_14 },if=none,id=drv14"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv14,serial=serial#14"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_3_14 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_3_14 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_3_15 = libvirt_nvme_path + "k-3_15.qcow2"
+            unless File.exist? ( nvme_disk_3_15 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_3_15 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_3_15 },if=none,id=drv15"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv15,serial=serial#15"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_3_15 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_3_15 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_3_16 = libvirt_nvme_path + "k-3_16.qcow2"
+            unless File.exist? ( nvme_disk_3_16 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_3_16 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_3_16 },if=none,id=drv16"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv16,serial=serial#16"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_3_16 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_3_16 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_3_17 = libvirt_nvme_path + "k-3_17.qcow2"
+            unless File.exist? ( nvme_disk_3_17 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_3_17 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_3_17 },if=none,id=drv17"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv17,serial=serial#17"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_3_17 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_3_17 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_3_18 = libvirt_nvme_path + "k-3_18.qcow2"
+            unless File.exist? ( nvme_disk_3_18 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_3_18 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_3_18 },if=none,id=drv18"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv18,serial=serial#18"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_3_18 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_3_18 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_3_19 = libvirt_nvme_path + "k-3_19.qcow2"
+            unless File.exist? ( nvme_disk_3_19 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_3_19 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_3_19 },if=none,id=drv19"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv19,serial=serial#19"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_3_19 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_3_19 }"}
+                trigger.on_error = :halt
+            end
+            nvme_disk_3_20 = libvirt_nvme_path + "k-3_20.qcow2"
+            unless File.exist? ( nvme_disk_3_20 )
+                if provider == "libvirt"
+                    cmd = "qemu-img create -f qcow2 #{ nvme_disk_3_20 } 102400M"
+                    ok = system(cmd)
+                    if ! ok
+                        puts "Command failed: #{cmd}"
+                        exit
+                    end
+                end
+            end
+
+
+            # Make disk file accessible as a device
+            libvirt.qemuargs :value => "-drive"
+            libvirt.qemuargs :value => "file=#{ nvme_disk_3_20 },if=none,id=drv20"
+            libvirt.qemuargs :value => "-device"
+            libvirt.qemuargs :value => "nvme,drive=drv20,serial=serial#20"
+
+            # After destroying the box, remove the file we created
+            override.trigger.after :destroy do |trigger|
+                trigger.info = "Destroying file #{ nvme_disk_3_20 }"
+                trigger.run = {inline: "rm -f #{ nvme_disk_3_20 }"}
+                trigger.on_error = :halt
+            end
+ 	            # END: LIBVIRT NVME DRIVES
+        end # conf.vm.provider :libvirt do |libvirt, override|
+    end # config.vm.define "k-3" do |conf|
+
+end

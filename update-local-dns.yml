@@ -1,0 +1,10 @@
+---
+- name: Update local DNS
+  hosts: all
+  vars:
+    local_dns_group: "all"
+  tasks:
+    - name: Update local DNS on all hosts with Ansible Group {{ local_dns_group }}
+      include_role:
+        name: update-local-dns
+

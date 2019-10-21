@@ -1,0 +1,13 @@
+- name: Update local DNS (with IPs of the other Ansible nodes)
+  become: yes
+  become_user: root
+  lineinfile:
+    path: "/etc/hosts"
+    regexp: "{{ hostvars[item]['ansible_env'].SSH_CONNECTION.split(' ')[2] }}\t{{ hostvars[item]['ansible_hostname']}}\t{{ hostvars[item]['ansible_hostname']}}"
+    line: "{{ hostvars[item]['ansible_env'].SSH_CONNECTION.split(' ')[2] }}\t{{ hostvars[item]['ansible_hostname']}}\t{{ hostvars[item]['ansible_hostname']}}"
+    state: present
+    backup: yes
+  register: results
+  when: item != ansible_nodename
+  with_items: "{{groups[ local_dns_group ]}}"
+

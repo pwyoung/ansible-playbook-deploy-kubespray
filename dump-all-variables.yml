@@ -1,0 +1,9 @@
+---
+- name: Dump All Ansible Variables
+  hosts: all
+  become: yes
+  tasks:
+    - name: Dump all variables
+      include_role:
+        name: dump-all-variables
+

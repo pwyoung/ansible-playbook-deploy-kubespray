@@ -1,0 +1,16 @@
+---
+- name: Dump All Variables
+  import_playbook: dump-all-variables.yml
+  tags: [ never, debug ]
+
+- name: Update Local DNS
+  import_playbook: update-local-dns.yml
+
+- name: Find, Partition, And Mount Block Devices ("data drives")
+  import_playbook: ./find-partition-and-mount-block-devices.yml
+
+- name: Configure Kubespray User
+  import_playbook: configure-kubespray-user.yml
+
+- name: Install And Run Kubespray
+  import_playbook: install-and-run-kubespray.yml

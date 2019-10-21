@@ -1,0 +1,15 @@
+- name: Install Ansible via APT
+  become: yes
+  apt:
+    name: ansible
+    update_cache: yes
+  when: ansible_distribution == "Ubuntu"
+  #tags: [ never ]
+
+- name: Get Ansible Version (from command)
+  command: "ansible --version"
+  register: results  
+
+- name: Show Ansible Version
+  debug:
+    msg: "{{ results }}"

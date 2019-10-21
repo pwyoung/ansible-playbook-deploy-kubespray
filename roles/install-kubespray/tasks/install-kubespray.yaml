@@ -1,0 +1,80 @@
+- name: Set some facts
+  set_fact:
+    hosts_yml: "{{ hosts_yml }}"
+    ansible_playbook: "{{ ansible_playbook }}"
+    ansible_extra_vars_file: "{{ kubespray_user_dir }}/extra_vars.yaml"
+    kubespray_dir: "{{ kubespray_user_dir }}/kubespray"
+  vars:
+    ansible_playbook: "/usr/local/bin/ansible-playbook"
+    hosts_yml: "{{ kubespray_user_dir }}/kubespray/inventory/mycluster/hosts.yml"
+
+- name: Set more facts
+  set_fact:
+    kubespray_create_cluster_script: "{{ kubespray_user_dir }}/create-cluster.sh"
+    kubespray_create_cluster_log: "{{ kubespray_user_dir }}/create-cluster.log"
+    kubespray_create_cluster_cmd: "cd {{ kubespray_dir }} && {{ ansible_playbook }} -i {{ hosts_yml }} -e @{{ ansible_extra_vars_file }} --become --become-user=root cluster.yml"
+  vars:
+    ansible_playbook: "/usr/local/bin/ansible-playbook"
+    hosts_yml: "{{ kubespray_user_dir }}/kubespray/inventory/mycluster/hosts.yml"
+
+- name: Install Kubespray Git Repo
+  git:
+    repo: "{{ kubespray_repo }}"
+    dest: "{{ kubespray_user_dir }}/kubespray"
+    version: "{{ kubespray_version }}"
+    force: yes
+
+- name: Copy Sample Config files
+  command: "cp -rfp {{ src }} {{ dest }}"
+  vars:
+    src: "{{ kubespray_user_dir }}/kubespray/inventory/sample"
+    dest: "{{ kubespray_user_dir }}/kubespray/inventory/mycluster"
+
+- name: Install Kubespray inventory file
+  template:
+    src: templates/inventory/hosts.yml.j2
+    dest: "{{ hosts_yml }}"
+    mode: '0700'
+
+- name: Set path to our local Ansible extra_vars.yaml
+  set_fact:
+#    local_file: "{{ lookup('env','ANSIBLE_DIR') }}/extra_vars.yaml"
+    local_file: "{{ ANSIBLE_DIR }}/extra_vars.yaml"
+
+- name: Show path to our local Ansible extra_vars.yaml
+  debug:
+    msg: "EXTRA_VARS={{ local_file }}"
+
+- name: Copy our local Ansible extra_vars.yaml
+  copy:
+    content: "{{ lookup('file', local_file) }}"
+    dest: "{{ ansible_extra_vars_file }}"
+    mode: 0600
+
+- name: Create a script to create the cluster
+  copy:
+    content: "{{ kubespray_create_cluster_cmd }} | tee {{ kubespray_create_cluster_log }}"
+    dest: "{{ kubespray_create_cluster_script }}"
+    mode: 0744
+
+- name: Install Kubespray Python requirements
+  become: yes
+  pip:
+    requirements: "{{ kubespray_user_dir }}/kubespray/requirements.txt"
+    executable: "pip3"
+
+- name: Install SSH config file
+  template:
+    src: templates/ssh/config.j2
+    dest: "{{ kubespray_user_dir }}/.ssh/config"
+    mode: '0644'
+
+- name: Run Kubespray
+  shell: "{{ kubespray_create_cluster_script }}"
+  args:
+    chdir: "{{ kubespray_dir }}"
+  register: result
+
+- name: Show Kubespray results
+  debug:
+    msg: "{{ result }}"
