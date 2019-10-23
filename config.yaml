@@ -114,16 +114,16 @@ ansible:
   # A script, build/run-playbooks.sh will be created so that the playbooks
   # can be run manually (e.g. during development of a local role)
   playbooks:
+    #EXAMPLE
+    #- name: "ansible-playbook-sanity-check"
+    #  src: "https://github.com/pwyoung/ansible-playbook-sanity-check"
+    #  method: git
+    #  version: 0.0.1
+    #  entry: playbook.yaml # Defaults to site.yml
     - name: ansible-playbook-deploy-kubespray
       scm: git
-      src: file:///home/pyoung/git/pwyoung/ansible-playbook-deploy-kubespray      
-      version: master
-      #entry: site.yml # Default
-#    - src: "https://github.com/pwyoung/ansible-playbook-sanity-check"
-#      name: "ansible-playbook-sanity-check"
-#      method: git
-#      version: 0.0.1
-#      entry: playbook.yaml # Defaults to site.yml
+      src: file:///home/pyoung/git/pwyoung/ansible-playbook-deploy-kubespray
+      version: dev
   # Use this to create build/inventory.yml
   inventory:
     all:

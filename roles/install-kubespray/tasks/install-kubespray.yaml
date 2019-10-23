@@ -1,0 +1,60 @@
+#TODO: Move some of these to ../defaults/
+- name: Install-Kubespray facts
+  set_fact:
+    kubespray_dir: "{{ kubespray_user_dir }}/kubespray"  
+    kubespray_create_cluster_cmd: "{{ ansible_playbook }} -i {{ hosts_yml }} --become --become-user=root cluster.yml"
+    kubespray_create_cluster_script: "{{ kubespray_user_dir }}/create-cluster.sh"
+    kubespray_create_cluster_log: "{{ kubespray_user_dir }}/create-cluster.log"
+    hosts_yml: "{{ hosts_yml }}"
+  vars:
+    ansible_playbook: "/usr/local/bin/ansible-playbook"
+    hosts_yml: "{{ kubespray_user_dir }}/kubespray/inventory/mycluster/hosts.yml"
+
+- name: Install SSH config file
+  template:
+    src: templates/ssh/config.j2
+    dest: "{{ kubespray_user_dir }}/.ssh/config"
+    mode: '0644'
+  
+- name: Install Kubespray Git Repo
+  git:
+    repo: "{{ kubespray_repo }}"
+    dest: "{{ kubespray_user_dir }}/kubespray"
+    version: "{{ kubespray_version }}"
+    force: yes
+  
+- name: Install Kubespray Python requirements
+  become: yes
+  pip:
+    requirements: "{{ kubespray_user_dir }}/kubespray/requirements.txt"
+    executable: "pip3"
+
+- name: Copy Sample Config files
+  command: "cp -rfp {{ src }} {{ dest }}"
+  vars:
+    src: "{{ kubespray_user_dir }}/kubespray/inventory/sample"
+    dest: "{{ kubespray_user_dir }}/kubespray/inventory/mycluster"
+
+- name: TODO - add extra_vars.yaml to override config. Test that we can omit blocks
+  debug:
+    msg: "{{ result }}"
+
+- name: Install Kubespray inventory file
+  template:
+    src: templates/inventory/hosts.yml.j2
+    dest: "{{ hosts_yml }}"
+    mode: '0700'
+
+- name: Create a script to create the cluster
+  copy:
+    content: "cd {{ kubespray_dir }} && time {{ kubespray_create_cluster_cmd }} | tee {{ kubespray_create_cluster_log }}"
+    dest: "{{ kubespray_create_cluster_script }}"
+    mode: 0744
+    
+- name: Run Kubespray
+  shell: "sh -x {{ kubespray_create_cluster_script }}"
+  register: result
+
+- name: Show Kubespray results
+  debug:
+    msg: "{{ result }}"

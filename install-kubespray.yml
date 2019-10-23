@@ -1,60 +1,9 @@
 ---
-- name: Assign kubespray_user and kubespray_user_dir
-  hosts: all
-  tasks:
-    - name: Use the current ansible user
-      set_fact:
-        kubespray_user: "{{ ansible_user_id }}"
-        kubespray_user_dir: "{{ ansible_user_dir }}"
-
-- name: Create the SSH key
-  hosts: kube-master[0]
-  become: yes
-  become_user: "{{ kubespray_user }}"
-  any_errors_fatal: true
-  tasks:
-    - name: Create SSH Key
-      user:
-        name: "{{ kubespray_user }}"
-        generate_ssh_key: yes
-        ssh_key_file: .ssh/id_rsa
-    - name: Store public key as fact
-      shell: cat "{{ kubespray_user_dir }}"/.ssh/id_rsa.pub
-      register: pub_key
-    - set_fact:
-        pub_key_contents: "{{ pub_key.stdout }}"
-    - debug:
-        msg: "pub_key_contents: {{ pub_key_contents }}"
-    - debug:
-        msg: "kubespray_user_dir: {{ kubespray_user_dir }}"
-
-- name: Install the Kubespray user's Public SSH key on each host
-  hosts: all
-  become: yes
-  become_user: "{{ kubespray_user }}"
-  gather_facts: true
-  any_errors_fatal: true
-  tasks:
-    - authorized_key:
-        user: "{{ kubespray_user }}"
-        state: present
-        key: "{{ hostvars[ groups['kube-master'][0] ].pub_key_contents }}"
-
-- name: Install Kubespray Requirements on all nodes
-  hosts: all
-  become: yes
-  tasks:
-    - name: Disable Swap
-      shell: swapoff -a
-      #TODO: use swappiness
-      #shell: /usr/sbin/sysctl vm.swappiness=0 # Requires setting "kubelet_fail_swap_on: false"
-
 - name: Install Kubespray
+  gather_facts: yes
   hosts: kube-master[0]
-  become: yes
-  become_user: "{{ kubespray_user }}"
   tasks:
-    - name: Include install-kubespray Role
+    - name: Install Kubespray Role
       include_role:
         name: install-kubespray
-      when: install_kubespray
+

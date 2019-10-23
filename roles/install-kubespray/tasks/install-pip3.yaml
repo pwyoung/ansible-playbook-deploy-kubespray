@@ -1,4 +1,5 @@
 ---
+# TODO: replace this with a robust role
 - name: Confirm Python3 is present
   shell: "python3 --version"
   register: result
@@ -7,19 +8,13 @@
   debug:
     msg={{ result }}
 
-# Always do the apt-update
-#- name: Check for Pip3
-#  shell: "pip3 --version"
-#  register: result
-#  ignore_errors: true
-
 - name: Install Pip3 (with apt-update)
   become: yes
   apt:
     name: python3-pip
     state: present
     update_cache: yes
-#  when: result.failed
+  when: ansible_distribution == "Ubuntu"    
 
 - name: Confirm Pip3 version
   shell: "pip3 --version"
@@ -28,5 +23,3 @@
 - name: Show Pip3 version
   debug:
     msg={{ result }}
-
-

@@ -1,11 +1,11 @@
-- name: Install Kubespray Git Repo
-  git:
-    repo: "{{ kubespray_repo }}"
-    dest: "{{ kubespray_user_dir }}/kubespray"
-    version: "{{ kubespray_version }}"
-    force: yes
+---
+- name: Install Ansible
+  include_tasks: install-ansible.yaml
+  #tags: [ never, debug ]
+  
+- name: Install Pip3
+  include_tasks: install-pip3.yaml
 
-- name: Install Python requirements
-  pip:
-    requirements: "{{ kubespray_user_dir }}/kubespray/requirements.txt"
-    executable: "pip3"
+- name: Install Kubespray
+  include_tasks: install-kubespray.yaml
+

@@ -1,0 +1,41 @@
+---
+- name: Assign kubespray_user and kubespray_user_dir
+  hosts: all
+  tasks:
+    - name: Use the current ansible user
+      set_fact:
+        kubespray_user: "{{ ansible_user_id }}"
+        kubespray_user_dir: "{{ ansible_user_dir }}"
+
+- name: Create the SSH key
+  hosts: kube-master[0]
+  become: yes
+  become_user: "{{ kubespray_user }}"
+  any_errors_fatal: true
+  tasks:
+    - name: Create SSH Key
+      user:
+        name: "{{ kubespray_user }}"
+        generate_ssh_key: yes
+        ssh_key_file: .ssh/id_rsa
+    - name: Store public key as fact
+      shell: cat "{{ kubespray_user_dir }}"/.ssh/id_rsa.pub
+      register: pub_key
+    - set_fact:
+        pub_key_contents: "{{ pub_key.stdout }}"
+    - debug:
+        msg: "pub_key_contents: {{ pub_key_contents }}"
+    - debug:
+        msg: "kubespray_user_dir: {{ kubespray_user_dir }}"
+
+- name: Distribute Ansible user's Public SSH key to all hosts
+  hosts: all
+  become: yes
+  become_user: "{{ kubespray_user }}"
+  gather_facts: true
+  any_errors_fatal: true
+  tasks:
+    - authorized_key:
+        user: "{{ kubespray_user }}"
+        state: present
+        key: "{{ hostvars[ groups['kube-master'][0] ].pub_key_contents }}"
