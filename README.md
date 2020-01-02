@@ -3,12 +3,10 @@
 This contains a playbook (site.yml) that installs Kubespray and then executes it.
 The playbook will:
   - Update /etc/hosts on each host so that they can find each other via local DNS
-  - Find
-  - install Kubespray
-  -
-
-The playbook will
-
+  - Set up passwordless-SSH from the installation host to all hosts
+  - Install Ansible and Kubespray on the installation host
+  - Create a script to run Kubespray and log all output to a file
+  - Run the installation script
 
 # Dependencies
 - Ansible Roles:

@@ -1,10 +1,12 @@
 MAKEFILE_PATH=$(dir $(realpath $(firstword $(MAKEFILE_LIST))))
-.PHONY=test clean
+.PHONY=test clean FORCE:
 
-test:
+test: FORCE
 	$(info Test)
 	make -C $(MAKEFILE_PATH)/tests/run-all
 
-clean:
+clean: FORCE
 	$(info Clean)
 	make -C $(MAKEFILE_PATH)/tests/run-all clean
+
+FORCE:
