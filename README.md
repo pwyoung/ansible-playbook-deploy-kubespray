@@ -1,6 +1,17 @@
 # PURPOSE
 
 This contains a playbook (site.yml) that installs Kubespray and then executes it.
+
+# TL/DR
+Steps:
+  - Create a cluster:
+    - make
+  - Access the cluster
+    - ssh k-1
+    - sudo su -
+    - kubectl get nodes
+
+# Details
 The playbook will:
   - Update /etc/hosts on each host so that they can find each other via local DNS
   - Set up passwordless-SSH from the installation host to all hosts
