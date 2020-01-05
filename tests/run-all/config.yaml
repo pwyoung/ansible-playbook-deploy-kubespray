@@ -10,7 +10,7 @@ vagrant:
     - name: k-4
     #- name: k-5
   global:
-    memory: 8192
+    memory: 12288
     cpus: 2
     boot_timeout: 300
     nvme_disks:
