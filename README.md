@@ -30,7 +30,7 @@ The playbook will:
       scm: "git"
       version: "master"
     - name: "create_partition"
-      src: "https://github.com/mcgrof/create_partition.git"
+      src: "https://github.com/pwyoung/ansible-role-create-partition.git"
       scm: "git"
       version: "v1.2.1"
  ```
